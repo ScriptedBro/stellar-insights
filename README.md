@@ -4,6 +4,11 @@
 
 [![React](https://img.shields.io/badge/React-19-blue)](https://react.dev) [![Rust](https://img.shields.io/badge/Rust-1.70+-orange)](https://rust-lang.org) [![Stellar](https://img.shields.io/badge/Stellar-Network-brightgreen)](https://stellar.org)
 
+![Backend CI](https://github.com/Ndifreke000/stellar-insights/workflows/Backend%20CI/badge.svg)
+![Frontend CI](https://github.com/Ndifreke000/stellar-insights/workflows/Frontend%20CI/badge.svg)
+![Contracts CI](https://github.com/Ndifreke000/stellar-insights/workflows/Smart%20Contracts%20CI/badge.svg)
+![Full Stack CI](https://github.com/Ndifreke000/stellar-insights/workflows/Full%20Stack%20CI/badge.svg)
+
 ---
 
 ## 🎯 What It Does
