@@ -5,12 +5,8 @@ import { motion } from 'framer-motion';
 import { 
   Settings, 
   Bell, 
-  BellOff, 
   Volume2, 
-  VolumeX, 
   Monitor,
-  Smartphone,
-  Clock,
   Save,
   RotateCcw
 } from 'lucide-react';
@@ -30,13 +26,19 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
   const [localPreferences, setLocalPreferences] = useState<NotificationPreferencesType>(preferences);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const handlePreferenceChange = (key: keyof NotificationPreferencesType, value: any) => {
+  const handlePreferenceChange = <K extends keyof NotificationPreferencesType>(
+    key: K,
+    value: NotificationPreferencesType[K],
+  ) => {
     const newPreferences = { ...localPreferences, [key]: value };
     setLocalPreferences(newPreferences);
     setHasChanges(JSON.stringify(newPreferences) !== JSON.stringify(preferences));
   };
 
-  const handleSoundChange = (key: keyof NotificationPreferencesType['sound'], value: any) => {
+  const handleSoundChange = <K extends keyof NotificationPreferencesType['sound']>(
+    key: K,
+    value: NotificationPreferencesType['sound'][K],
+  ) => {
     const newSound = { ...localPreferences.sound, [key]: value };
     handlePreferenceChange('sound', newSound);
   };
@@ -59,7 +61,12 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
   const testSound = () => {
     // Create a simple test sound
     if (typeof window !== 'undefined' && localPreferences.sound.enabled) {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextCtor) return;
+
+      const audioContext = new AudioContextCtor();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       

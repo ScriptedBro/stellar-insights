@@ -28,7 +28,11 @@ export const useNotificationSound = () => {
 
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextCtor) return null;
+      audioContextRef.current = new AudioContextCtor();
     }
     return audioContextRef.current;
   }, []);
@@ -42,6 +46,7 @@ export const useNotificationSound = () => {
 
     try {
       const audioContext = initAudioContext();
+      if (!audioContext) return;
       if (audioContext.state === 'suspended') {
         audioContext.resume();
       }

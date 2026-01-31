@@ -69,7 +69,7 @@ export default function Home() {
   const handleConnect = async () => {
     try {
       await connectWallet();
-    } catch (error) {
+    } catch {
       showToast({
         type: 'error',
         priority: 'high',
@@ -85,7 +85,7 @@ export default function Home() {
     try {
       disconnectWallet();
       setShowWalletMenu(false);
-    } catch (error) {
+    } catch {
       showToast({
         type: 'error',
         priority: 'medium',

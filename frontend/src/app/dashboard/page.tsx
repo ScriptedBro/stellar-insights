@@ -16,10 +16,36 @@ interface DashboardData {
     liquidityDepth: { value: number; trend: number; trendDirection: 'up' | 'down' };
     settlementSpeed: { value: number; trend: number; trendDirection: 'up' | 'down' };
   };
-  corridors: any[];
-  liquidity: any[];
-  assets: any[];
-  settlement: any[];
+  corridors: CorridorHealthItem[];
+  liquidity: LiquidityData[];
+  assets: TopAsset[];
+  settlement: SettlementData[];
+}
+
+interface CorridorHealthItem {
+  id: string;
+  name: string;
+  status: 'optimal' | 'degraded' | 'down';
+  uptime: number;
+  volume24h: number;
+}
+
+interface LiquidityData {
+  date: string;
+  value: number;
+}
+
+interface TopAsset {
+  symbol: string;
+  name: string;
+  volume24h: number;
+  price: number;
+  change24h: number;
+}
+
+interface SettlementData {
+  time: string;
+  speed: number;
 }
 
 const formatCompactNumber = (value: number) =>

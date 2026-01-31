@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, Suspense } from "react";
-import { Search, Anchor as AnchorIcon, ExternalLink, BarChart3, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Search, Anchor as AnchorIcon, ExternalLink, BarChart3, ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle, AlertCircle, Activity } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ResponsiveContainer, LineChart, Line } from "recharts";
@@ -14,28 +14,6 @@ import { DataTablePagination } from "@/components/ui/DataTablePagination";
 const truncateAddress = (address: string) => {
   if (!address) return "";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
-
-const getHealthStatusColor = (status: string) => {
-  const normalizedStatus = status.toLowerCase();
-  if (normalizedStatus === "green" || normalizedStatus === "healthy") {
-    return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
-  } else if (normalizedStatus === "yellow" || normalizedStatus === "warning") {
-    return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400";
-  } else {
-    return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
-  }
-};
-
-const getHealthStatusIcon = (status: string) => {
-  const normalizedStatus = status.toLowerCase();
-  if (normalizedStatus === "green" || normalizedStatus === "healthy") {
-    return "●";
-  } else if (normalizedStatus === "yellow" || normalizedStatus === "warning") {
-    return "●";
-  } else {
-    return "●";
-  }
 };
 
 const generateMockHistoricalData = (currentScore: number) => {
@@ -143,6 +121,8 @@ const AnchorsPageContent = () => {
     endIndex,
   } = usePagination(sortedAndFilteredAnchors.length);
 
+  const paginatedAnchors = sortedAndFilteredAnchors.slice(startIndex, endIndex);
+
   const getHealthStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "healthy":
@@ -203,45 +183,60 @@ const AnchorsPageContent = () => {
           </div>
         )}
 
-          {/* Sort Controls */}
-          <div className="flex gap-2">
-            <select
-              value={sortBy}
-              onChange={(e) =>
-                setSortBy(
-                  e.target.value as
-                    | "reliability"
-                    | "transactions"
-                    | "failure_rate",
-                )
-              }
-              className="px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="reliability">Reliability Score</option>
-              <option value="transactions">Total Transactions</option>
-              <option value="failure_rate">Failure Rate</option>
-            </select>
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search anchors..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-            <button
-              onClick={() =>
-                setSortOrder(sortOrder === "desc" ? "asc" : "desc")
-              }
-              className="px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {sortOrder === "desc" ? (
-                <TrendingDown className="w-4 h-4" />
-              ) : (
-                <TrendingUp className="w-4 h-4" />
-              )}
-            </button>
+            <div className="flex gap-2">
+              <select
+                value={sortBy}
+                onChange={(e) =>
+                  setSortBy(
+                    e.target.value as
+                      | "reliability"
+                      | "transactions"
+                      | "failure_rate",
+                  )
+                }
+                className="px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="reliability">Reliability Score</option>
+                <option value="transactions">Total Transactions</option>
+                <option value="failure_rate">Failure Rate</option>
+              </select>
+
+              <button
+                onClick={() =>
+                  setSortDirection(sortDirection === "desc" ? "asc" : "desc")
+                }
+                className="px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {sortDirection === "desc" ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronUp className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
+
           {!loading && !error && sortedAndFilteredAnchors.length > 0 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               💡 Click on any row to view anchor details • Click column headers to sort
             </p>
           )}
         </div>
-          <div className="space-y-4">
+
+        <div className="space-y-4">
             <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
               {/* Desktop Table */}
               <div className="hidden lg:block overflow-x-auto">

@@ -1,10 +1,9 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { WebSocketNotificationPayload } from '@/types/notifications';
 
 interface UseWebSocketOptions {
   url: string;
-  onMessage?: (data: WebSocketNotificationPayload) => void;
+  onMessage?: (data: unknown) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Event) => void;
@@ -33,6 +32,7 @@ export const useWebSocket = ({
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const startHeartbeatRef = useRef<() => void>(() => {});
   const reconnectCountRef = useRef(0);
   const isManualCloseRef = useRef(false);
   const isMountedRef = useRef(true);
@@ -73,7 +73,7 @@ export const useWebSocket = ({
     heartbeatTimeoutRef.current = setTimeout(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'ping' }));
-        startHeartbeat();
+        startHeartbeatRef.current();
       }
     }, heartbeatInterval);
   }, [heartbeatInterval]);
@@ -112,23 +112,23 @@ export const useWebSocket = ({
 
       wsRef.current.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const data: unknown = JSON.parse(event.data);
           
           // Handle heartbeat response
-          if (data.type === 'pong') {
-            return;
+          if (data && typeof data === 'object' && 'type' in data) {
+            const type = (data as { type?: string }).type;
+            if (type === 'pong') {
+              return;
+            }
           }
 
-          // Handle notification messages
-          if (data.type && data.data) {
-            onMessage?.(data as WebSocketNotificationPayload);
-          }
+          onMessage?.(data);
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
         }
       };
 
-      wsRef.current.onclose = (event) => {
+      wsRef.current.onclose = () => {
         safeSetState(prev => ({ 
           ...prev, 
           isConnected: false, 
@@ -157,14 +157,14 @@ export const useWebSocket = ({
         onError?.(error);
       };
 
-    } catch (error) {
+    } catch {
       safeSetState(prev => ({ 
         ...prev, 
         error: 'Failed to create WebSocket connection',
         isConnecting: false 
       }));
     }
-  }, [url, onMessage, onConnect, onDisconnect, onError, reconnectAttempts, reconnectInterval, startHeartbeat, clearTimeouts, shouldConnect]);
+  }, [url, onMessage, onConnect, onDisconnect, onError, reconnectAttempts, reconnectInterval, startHeartbeat, clearTimeouts, shouldConnect, safeSetState]);
 
   const disconnect = useCallback(() => {
     isManualCloseRef.current = true;
@@ -181,13 +181,15 @@ export const useWebSocket = ({
       isConnecting: false 
     }));
     reconnectCountRef.current = 0;
-  }, [clearTimeouts]);
+  }, [clearTimeouts, safeSetState]);
 
-  // Update refs
-  connectRef.current = connect;
-  disconnectRef.current = disconnect;
+  useEffect(() => {
+    startHeartbeatRef.current = startHeartbeat;
+    connectRef.current = connect;
+    disconnectRef.current = disconnect;
+  }, [startHeartbeat, connect, disconnect]);
 
-  const sendMessage = useCallback((message: any) => {
+  const sendMessage = useCallback((message: unknown) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
       return true;
@@ -220,4 +222,3 @@ export const useWebSocket = ({
     sendMessage,
   };
 };
-

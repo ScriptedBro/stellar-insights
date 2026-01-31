@@ -1,13 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef } from 'react';
 import { 
   BaseNotification, 
   NotificationContextType, 
   NotificationPreferences, 
   ToastNotification,
-  WebSocketNotificationPayload,
-  NotificationPriority
+  WebSocketNotificationPayload
 } from '@/types/notifications';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
@@ -45,62 +44,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const [notifications, setNotifications] = useLocalStorage<BaseNotification[]>('stellar-notifications', []);
   const [preferences, setPreferences] = useLocalStorage<NotificationPreferences>('stellar-notification-preferences', DEFAULT_PREFERENCES);
   const { playSound } = useNotificationSound();
-  const [isClient, setIsClient] = useState(false);
-
-  // Only initialize client-side features after hydration
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // WebSocket connection for real-time notifications
-  const handleWebSocketMessage = useCallback((payload: WebSocketNotificationPayload) => {
-    if (!isClient) return; // Don't handle messages during SSR
-    
-    const categoryMap = {
-      'payment_failed': 'payments' as const,
-      'low_liquidity': 'liquidity' as const,
-      'new_snapshot': 'snapshots' as const,
-      'system_alert': 'system' as const,
-    };
-
-    const typeMap = {
-      'payment_failed': 'error' as const,
-      'low_liquidity': 'warning' as const,
-      'new_snapshot': 'info' as const,
-      'system_alert': 'warning' as const,
-    };
-
-    const category = categoryMap[payload.type];
-    const type = typeMap[payload.type];
-
-    // Check if this category is enabled
-    if (!preferences.enabled || !preferences.categories[category]) {
-      return;
-    }
-
-    showToast({
-      type,
-      priority: payload.data.priority,
-      title: payload.data.title,
-      message: payload.data.message,
-      category,
-      metadata: payload.data.metadata,
-    });
-  }, [preferences, isClient]);
-
-  const { isConnected, reconnectCount } = useWebSocket({
-    url: websocketUrl,
-    onMessage: handleWebSocketMessage,
-    onConnect: () => {
-      if (isClient) console.log('WebSocket connected for notifications');
-    },
-    onDisconnect: () => {
-      if (isClient) console.log('WebSocket disconnected');
-    },
-    onError: (error) => {
-      if (isClient) console.error('WebSocket error:', error);
-    },
-  });
+  const isClient = typeof window !== 'undefined';
 
   const generateId = useCallback(() => {
     return `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -154,6 +98,64 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
     return id;
   }, [generateId, preferences, setNotifications, playSound, isClient]);
+
+  // WebSocket connection for real-time notifications
+  const isNotificationPayload = (payload: unknown): payload is WebSocketNotificationPayload => {
+    if (!payload || typeof payload !== 'object') return false;
+    if (!('type' in payload) || !('data' in payload)) return false;
+    const data = (payload as WebSocketNotificationPayload).data;
+    return !!data && typeof data === 'object' && 'title' in data && 'message' in data;
+  };
+
+  const handleWebSocketMessage = useCallback((payload: unknown) => {
+    if (!isClient) return; // Don't handle messages during SSR
+    if (!isNotificationPayload(payload)) return;
+    
+    const categoryMap = {
+      'payment_failed': 'payments' as const,
+      'low_liquidity': 'liquidity' as const,
+      'new_snapshot': 'snapshots' as const,
+      'system_alert': 'system' as const,
+    };
+
+    const typeMap = {
+      'payment_failed': 'error' as const,
+      'low_liquidity': 'warning' as const,
+      'new_snapshot': 'info' as const,
+      'system_alert': 'warning' as const,
+    };
+
+    const category = categoryMap[payload.type];
+    const type = typeMap[payload.type];
+
+    // Check if this category is enabled
+    if (!preferences.enabled || !preferences.categories[category]) {
+      return;
+    }
+
+    showToast({
+      type,
+      priority: payload.data.priority,
+      title: payload.data.title,
+      message: payload.data.message,
+      category,
+      metadata: payload.data.metadata,
+    });
+  }, [preferences, isClient, showToast]);
+
+  const { isConnected, reconnectCount } = useWebSocket({
+    url: websocketUrl,
+    onMessage: handleWebSocketMessage,
+    onConnect: () => {
+      if (isClient) console.log('WebSocket connected for notifications');
+    },
+    onDisconnect: () => {
+      if (isClient) console.log('WebSocket disconnected');
+    },
+    onError: (error) => {
+      if (isClient) console.error('WebSocket error:', error);
+    },
+  });
 
   const dismissToast = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
@@ -223,7 +225,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         clearTimeout(cleanupTimeoutRef.current);
       }
     };
-  }, [notifications.length, isClient]);
+  }, [notifications.length, isClient, setNotifications]);
 
   // Show connection status notifications only if WebSocket URL is provided (client-side only)
   useEffect(() => {

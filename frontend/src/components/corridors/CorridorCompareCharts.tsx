@@ -19,6 +19,8 @@ interface CompareChartsProps {
   corridors: CorridorDetailData[];
 }
 
+type CompareChartPoint = { timestamp: string } & Record<string, number | string>;
+
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b"];
 
 export function SuccessRateCompareChart({ corridors }: CompareChartsProps) {
@@ -31,7 +33,7 @@ export function SuccessRateCompareChart({ corridors }: CompareChartsProps) {
   ).sort();
 
   const chartData = allTimestamps.map((ts) => {
-    const dataPoint: any = { timestamp: ts };
+    const dataPoint: CompareChartPoint = { timestamp: ts };
     corridors.forEach((c) => {
       const point = c.historical_success_rate.find((d) => d.timestamp === ts);
       if (point) {
@@ -95,7 +97,7 @@ export function VolumeCompareChart({ corridors }: CompareChartsProps) {
   ).sort();
 
   const chartData = allTimestamps.map((ts) => {
-    const dataPoint: any = { timestamp: ts };
+    const dataPoint: CompareChartPoint = { timestamp: ts };
     corridors.forEach((c) => {
       const point = c.historical_volume.find((d) => d.timestamp === ts);
       if (point) {
@@ -160,7 +162,7 @@ export function SlippageCompareChart({ corridors }: CompareChartsProps) {
   ).sort();
 
   const chartData = allTimestamps.map((ts) => {
-    const dataPoint: any = { timestamp: ts };
+    const dataPoint: CompareChartPoint = { timestamp: ts };
     corridors.forEach((c) => {
       const point = c.historical_slippage.find((d) => d.timestamp === ts);
       if (point) {

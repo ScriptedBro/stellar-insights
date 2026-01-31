@@ -4,11 +4,40 @@ import { format } from "date-fns";
 
 interface ExportPreviewProps {
   metrics: MetricOption[];
-  data: any[];
+  data: ExportRow[];
 }
+
+type ExportRow = Record<string, unknown>;
 
 export function ExportPreview({ metrics, data }: ExportPreviewProps) {
   const activeMetrics = metrics.filter((m) => m.checked);
+  const formatCellValue = (metricId: string, value: unknown) => {
+    if (metricId === "date") {
+      const dateValue =
+        value instanceof Date
+          ? value
+          : typeof value === "string" || typeof value === "number"
+            ? new Date(value)
+            : null;
+      return dateValue ? format(dateValue, "yyyy-MM-dd HH:mm") : "—";
+    }
+
+    if (metricId === "success_rate" && typeof value === "number") {
+      return `${(value * 100).toFixed(2)}%`;
+    }
+
+    if ((metricId === "total_volume" || metricId === "tvl") && typeof value === "number") {
+      return `$${value.toLocaleString()}`;
+    }
+
+    if (metricId === "latency" && typeof value === "number") {
+      return `${value} ms`;
+    }
+
+    if (value === null || value === undefined) return "—";
+    if (typeof value === "string" || typeof value === "number") return value;
+    return JSON.stringify(value);
+  };
 
   if (activeMetrics.length === 0) {
     return (
@@ -51,23 +80,7 @@ export function ExportPreview({ metrics, data }: ExportPreviewProps) {
                     key={`${idx}-${metric.id}`}
                     className="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300"
                   >
-                    {/* Basic formatting logic */}
-                    {metric.id === "date" &&
-                      format(new Date(row[metric.id]), "yyyy-MM-dd HH:mm")}
-                    {metric.id === "success_rate" &&
-                      `${(row[metric.id] * 100).toFixed(2)}%`}
-                    {metric.id === "total_volume" &&
-                      `$${row[metric.id].toLocaleString()}`}
-                    {metric.id === "tvl" &&
-                      `$${row[metric.id].toLocaleString()}`}
-                    {metric.id === "latency" && `${row[metric.id]} ms`}
-                    {![
-                      "date",
-                      "success_rate",
-                      "total_volume",
-                      "tvl",
-                      "latency",
-                    ].includes(metric.id) && row[metric.id]}
+                    {formatCellValue(metric.id, row[metric.id])}
                   </td>
                 ))}
               </tr>

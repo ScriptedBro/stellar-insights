@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
     ArrowLeft,
     Share2,
     BarChart3,
-    Check,
-    Share
+    Check
 } from "lucide-react";
 import Link from "next/link";
 import { MainLayout } from "@/components/layout";
@@ -29,7 +28,7 @@ import {
 function ComparisonContent() {
     const searchParams = useSearchParams();
     const idsString = searchParams.get("ids") || "";
-    const [selectedIds, setSelectedIds] = useState<string[]>(
+    const [selectedIds] = useState<string[]>(
         idsString ? idsString.split(",").filter(Boolean) : []
     );
     const [corridorData, setCorridorData] = useState<CorridorDetailData[]>([]);
@@ -52,7 +51,7 @@ function ComparisonContent() {
                             // but it's used in [pair]/page.tsx so we assume it works or we use mock
                             const data = await getCorridorDetail(id);
                             return data;
-                        } catch (e) {
+                        } catch {
                             console.log(`Failed to fetch ${id}, using mock`);
                             return generateMockCorridorData(id);
                         }

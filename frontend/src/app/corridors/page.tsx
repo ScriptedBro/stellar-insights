@@ -9,9 +9,7 @@ import {
   List,
   Droplets,
   CheckCircle2,
-  AlertCircle,
-  ArrowRight,
-
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -22,8 +20,6 @@ import { mockCorridors } from "@/components/lib//mockCorridorData";
 import { MainLayout } from "@/components/layout";
 import { SkeletonCorridorCard } from "@/components/ui/Skeleton";
 import { CorridorHeatmap } from "@/components/charts/CorridorHeatmap";
-import { DataTablePagination } from "@/components/ui/DataTablePagination";
-import { usePagination } from "@/hooks/usePagination";
 
 function CorridorsPageContent() {
   const [corridors, setCorridors] = useState<CorridorMetrics[]>([]);
@@ -34,25 +30,11 @@ function CorridorsPageContent() {
     "success_rate" | "health_score" | "liquidity"
   >("health_score");
   // Filter state variables
-  const [successRateRange, setSuccessRateRange] = useState<[number, number]>([0, 100]);
-  const [volumeRange, setVolumeRange] = useState<[number, number]>([0, 10000000]);
-  const [assetCodeFilter, setAssetCodeFilter] = useState("");
-  const [timePeriod, setTimePeriod] = useState("7d");
+  const [successRateRange] = useState<[number, number]>([0, 100]);
+  const [volumeRange] = useState<[number, number]>([0, 10000000]);
+  const [assetCodeFilter] = useState("");
+  const [timePeriod] = useState("7d");
   const [showFilters, setShowFilters] = useState(false);
-  
-  // Filter presets state
-  const [filterPresets, setFilterPresets] = useState<Array<{
-    name: string;
-    filters: {
-      successRateRange: [number, number];
-      volumeRange: [number, number];
-      assetCodeFilter: string;
-      timePeriod: string;
-      searchTerm: string;
-      sortBy: "success_rate" | "health_score" | "liquidity";
-    };
-  }>>([]);
-  const [presetName, setPresetName] = useState("");
 
   const filteredCorridors = useMemo(() => {
     return corridors
@@ -74,15 +56,6 @@ function CorridorsPageContent() {
         }
       });
   }, [corridors, searchTerm, sortBy]);
-
-  const {
-    currentPage,
-    pageSize,
-    onPageChange,
-    onPageSizeChange,
-    startIndex,
-    endIndex,
-  } = usePagination(filteredCorridors.length);
 
   useEffect(() => {
     async function fetchCorridors() {
@@ -114,8 +87,6 @@ function CorridorsPageContent() {
 
     fetchCorridors();
   }, [successRateRange, volumeRange, assetCodeFilter, timePeriod, sortBy]);
-
-  const paginatedCorridors = filteredCorridors.slice(startIndex, endIndex);
 
   const getHealthColor = (score: number) => {
     if (score >= 90)
@@ -243,10 +214,13 @@ function CorridorsPageContent() {
             <CorridorHeatmap corridors={filteredCorridors} />
           </div>
         ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCorridors.map((corridor) => (
+              <div key={corridor.id} className="group">
                 <Link
                   href={`/corridors/${corridor.id}`}
+                  className="block bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 hover:border-blue-400 transition-colors"
                 >
-                  {/* Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1 min-w-0">
                       <h2 className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors truncate">
@@ -256,49 +230,54 @@ function CorridorsPageContent() {
                         {corridor.id}
                       </p>
                     </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        Success
+                      </p>
+                      <div className="flex items-center gap-2 justify-end">
+                        {getSuccessStatusIcon(corridor.success_rate)}
+                        <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                          {corridor.success_rate.toFixed(1)}%
                         </p>
-                        <div className="flex items-center gap-2">
-                          {getSuccessStatusIcon(corridor.success_rate)}
-                          <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                            {corridor.success_rate.toFixed(1)}%
-                          </p>
-                        </div>
-                      </div>
-                      <div
-                        className={`rounded-lg p-3 border ${getHealthColor(
-                          corridor.health_score,
-                        )}`}
-                      >
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          Health
-                        </p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-white">
-                          {corridor.health_score.toFixed(0)}
-                        </p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="text-xs">
-                            {getHealthStatus(corridor.health_score).icon}
-                          </span>
-                          <span
-                            className={`text-xs font-semibold ${getHealthStatus(corridor.health_score).color}`}
-                          >
-                            {getHealthStatus(corridor.health_score).label}
-                          </span>
-                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Metrics */}
-                  <div className="space-y-2 text-sm mb-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Avg Latency
-                      </span>
-                      <span className="font-semibold text-blue-600 dark:text-blue-400">
-                        {corridor.average_latency_ms.toFixed(0)}ms
-                      </span>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div
+                      className={`rounded-lg p-3 border ${getHealthColor(
+                        corridor.health_score,
+                      )}`}
+                    >
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Health
+                      </p>
+                      <p className="text-lg font-bold text-gray-900 dark:text-white">
+                        {corridor.health_score.toFixed(0)}
+                      </p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="text-xs">
+                          {getHealthStatus(corridor.health_score).icon}
+                        </span>
+                        <span
+                          className={`text-xs font-semibold ${getHealthStatus(corridor.health_score).color}`}
+                        >
+                          {getHealthStatus(corridor.health_score).label}
+                        </span>
+                      </div>
                     </div>
+
+                    <div className="rounded-lg p-3 border border-gray-200 dark:border-slate-700">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Avg Latency
+                      </p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                        {corridor.average_latency_ms.toFixed(0)}ms
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
                         <Droplets className="w-4 h-4" />
@@ -318,14 +297,11 @@ function CorridorsPageContent() {
                         M
                       </span>
                     </div>
-                    </div>
                   </div>
                 </Link>
               </div>
             ))}
           </div>
-        )}
-
         )}
 
         {/* Info Footer */}

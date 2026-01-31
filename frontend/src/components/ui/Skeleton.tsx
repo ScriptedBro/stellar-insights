@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 
 interface SkeletonProps {
   className?: string;
@@ -109,9 +109,7 @@ export const SkeletonChart: React.FC<{
   className?: string;
   height?: string | number;
 }> = ({ className = "", height = 300 }) => {
-  const randomHeights = useMemo(() => (
-    Array.from({ length: 12 }, () => Math.max(20, Math.random() * 100))
-  ), []);
+  const barHeights = Array.from({ length: 12 }, (_, index) => 20 + ((index * 37) % 80));
 
   return (
     <div
@@ -127,11 +125,11 @@ export const SkeletonChart: React.FC<{
           height: typeof height === "number" ? `${height}px` : height,
         }}
       >
-        {randomHeights.map((height, i) => (
+        {barHeights.map((barHeight, i) => (
           <Skeleton
             key={i}
             className="w-full rounded-t"
-            style={{ height: `${height}%` }}
+            style={{ height: `${barHeight}%` }}
           />
         ))}
       </div>

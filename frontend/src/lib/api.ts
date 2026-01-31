@@ -528,8 +528,6 @@ export async function fetchAnchors(params?: ListAnchorsParams): Promise<AnchorsR
     throw error;
   }
 }
-<<<<<<< HEAD
-
 /**
  * Prediction Request and Response Types
  */
@@ -664,5 +662,3 @@ export async function getPaymentPrediction(request: PredictionRequest): Promise<
     return generateMockPrediction(request);
   }
 }
-=======
->>>>>>> e3aef7b (fix: connect dashboard kpis to live data)

@@ -36,7 +36,7 @@ const generateRecentFailures = (): FailureRecord[] => {
   const reasons = ['Timeout', 'Insufficient liquidity', 'Path payment failed', 'Network congestion'];
   const corridors = ['USDC-PHP', 'EURC-NGN', 'USDT-KES', 'XLM-USD'];
   
-  return Array.from({ length: Math.floor(Math.random() * 5) + 1 }, (_, i) => ({
+  return Array.from({ length: Math.floor(Math.random() * 5) + 1 }, () => ({
     timestamp: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
     reason: reasons[Math.floor(Math.random() * reasons.length)],
     corridor: corridors[Math.floor(Math.random() * corridors.length)]

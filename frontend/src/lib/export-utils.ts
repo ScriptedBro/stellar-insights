@@ -2,20 +2,49 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 
+type ExportRow = Record<string, unknown>;
+type ExportColumn = { id: string; label: string };
+
+const formatExportValue = (colId: string, value: unknown): string => {
+  if (colId === "date") {
+    const dateValue =
+      value instanceof Date
+        ? value
+        : typeof value === "string" || typeof value === "number"
+          ? new Date(value)
+          : null;
+    return dateValue ? format(dateValue, "yyyy-MM-dd HH:mm:ss") : "";
+  }
+
+  if (colId === "success_rate" && typeof value === "number") {
+    return `${(value * 100).toFixed(2)}%`;
+  }
+
+  if ((colId === "total_volume" || colId === "tvl") && typeof value === "number") {
+    return `$${value.toLocaleString()}`;
+  }
+
+  if (colId === "latency" && typeof value === "number") {
+    return `${value} ms`;
+  }
+
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return value.toString();
+  return JSON.stringify(value);
+};
+
 export function generateCSV(
-  data: any[],
-  columns: { id: string; label: string }[],
+  data: ExportRow[],
+  columns: ExportColumn[],
 ) {
   const headers = columns.map((c) => c.label).join(",");
   const rows = data.map((row) =>
     columns
       .map((col) => {
-        let val = row[col.id];
-        if (col.id === "date")
-          val = format(new Date(val), "yyyy-MM-dd HH:mm:ss");
-        if (col.id === "success_rate") val = (val * 100).toFixed(2) + "%";
-        if (typeof val === "string" && val.includes(",")) return `"${val}"`;
-        return val;
+        const value = formatExportValue(col.id, row[col.id]);
+        if (value.includes(",")) return `"${value}"`;
+        return value;
       })
       .join(","),
   );
@@ -38,12 +67,12 @@ export function generateCSV(
 }
 
 export function generateJSON(
-  data: any[],
-  columns: { id: string; label: string }[],
+  data: ExportRow[],
+  columns: ExportColumn[],
 ) {
   // Filter data to only include selected columns
   const filteredData = data.map((row) => {
-    const newRow: any = {};
+    const newRow: Record<string, unknown> = {};
     columns.forEach((col) => {
       newRow[col.id] = row[col.id]; // keep raw values for JSON
     });
@@ -68,8 +97,8 @@ export function generateJSON(
 }
 
 export function generatePDF(
-  data: any[],
-  columns: { id: string; label: string }[],
+  data: ExportRow[],
+  columns: ExportColumn[],
   dateRange: { start: Date | null; end: Date | null },
 ) {
   const doc = new jsPDF();
@@ -94,15 +123,7 @@ export function generatePDF(
   // Table
   const tableHeaders = columns.map((c) => c.label);
   const tableData = data.map((row) =>
-    columns.map((col) => {
-      let val = row[col.id];
-      if (col.id === "date") val = format(new Date(val), "yyyy-MM-dd HH:mm");
-      if (col.id === "success_rate") val = (val * 100).toFixed(2) + "%";
-      if (col.id === "total_volume" || col.id === "tvl")
-        val = `$${val.toLocaleString()}`;
-      if (col.id === "latency") val = `${val} ms`;
-      return val;
-    }),
+    columns.map((col) => formatExportValue(col.id, row[col.id])),
   );
 
   autoTable(doc, {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useWebSocket, useSnapshotUpdates, useCorridorUpdates, useAnchorUpdates } from '@/hooks/useWebSocket';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { useState } from 'react';
 import type { WsMessage } from '@/lib/websocket';
 
@@ -15,15 +15,61 @@ import type { WsMessage } from '@/lib/websocket';
  */
 export function WebSocketDemo() {
   const [messages, setMessages] = useState<WsMessage[]>([]);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<Array<{ id: string; epoch: number; time: string }>>([]);
   const [corridors, setCorridors] = useState<Array<{ key: string; successRate: number; time: string }>>([]);
   const [anchors, setAnchors] = useState<Array<{ name: string; score: number; time: string }>>([]);
+  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8080/ws';
 
   // Main WebSocket connection
-  const { isConnected, connectionId, lastMessage, connect, disconnect, ping } = useWebSocket({
-    autoConnect: true,
+  const { isConnected, connect, disconnect, sendMessage } = useWebSocket({
+    url: wsUrl,
     onMessage: (message) => {
-      setMessages((prev) => [message, ...prev].slice(0, 10)); // Keep last 10 messages
+      if (!message || typeof message !== 'object' || !('type' in message)) {
+        return;
+      }
+
+      const type = (message as WsMessage).type;
+      if (!['snapshot_update', 'corridor_update', 'anchor_update', 'ping', 'pong', 'connected', 'error'].includes(type)) {
+        return;
+      }
+
+      const wsMessage = message as WsMessage;
+      setMessages((prev) => [wsMessage, ...prev].slice(0, 10)); // Keep last 10 messages
+
+      if (wsMessage.type === 'connected') {
+        setConnectionId(wsMessage.connection_id);
+      }
+      if (wsMessage.type === 'snapshot_update') {
+        setSnapshots((prev) => [
+          {
+            id: wsMessage.snapshot_id,
+            epoch: wsMessage.epoch,
+            time: new Date(wsMessage.timestamp).toLocaleTimeString(),
+          },
+          ...prev,
+        ].slice(0, 5));
+      }
+      if (wsMessage.type === 'corridor_update') {
+        setCorridors((prev) => [
+          {
+            key: wsMessage.corridor_key,
+            successRate: wsMessage.success_rate,
+            time: new Date().toLocaleTimeString(),
+          },
+          ...prev,
+        ].slice(0, 5));
+      }
+      if (wsMessage.type === 'anchor_update') {
+        setAnchors((prev) => [
+          {
+            name: wsMessage.name,
+            score: wsMessage.reliability_score,
+            time: new Date().toLocaleTimeString(),
+          },
+          ...prev,
+        ].slice(0, 5));
+      }
     },
     onConnect: () => {
       console.log('WebSocket connected!');
@@ -34,42 +80,6 @@ export function WebSocketDemo() {
     onError: (error) => {
       console.error('WebSocket error:', error);
     },
-  });
-
-  // Listen for snapshot updates
-  useSnapshotUpdates((update) => {
-    setSnapshots((prev) => [
-      {
-        id: update.snapshot_id,
-        epoch: update.epoch,
-        time: new Date().toLocaleTimeString(),
-      },
-      ...prev,
-    ].slice(0, 5));
-  });
-
-  // Listen for corridor updates
-  useCorridorUpdates((update) => {
-    setCorridors((prev) => [
-      {
-        key: update.corridor_key,
-        successRate: update.success_rate,
-        time: new Date().toLocaleTimeString(),
-      },
-      ...prev,
-    ].slice(0, 5));
-  });
-
-  // Listen for anchor updates
-  useAnchorUpdates((update) => {
-    setAnchors((prev) => [
-      {
-        name: update.name,
-        score: update.reliability_score,
-        time: new Date().toLocaleTimeString(),
-      },
-      ...prev,
-    ].slice(0, 5));
   });
 
   return (
@@ -106,7 +116,7 @@ export function WebSocketDemo() {
             ) : (
               <>
                 <button
-                  onClick={ping}
+                  onClick={() => sendMessage({ type: 'ping', timestamp: Date.now() })}
                   className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                 >
                   Send Ping
