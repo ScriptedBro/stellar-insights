@@ -1,6 +1,7 @@
 use crate::network::{NetworkConfig, StellarNetwork};
 use anyhow::{Context, Result};
 use reqwest::Client;
+use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::{Duration, Instant};
@@ -93,30 +94,46 @@ pub struct JsonRpcError {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LedgerInfo {
+    #[serde(deserialize_with = "deserialize_u64_from_string_or_number")]
     pub sequence: u64,
     pub hash: String,
+    #[serde(default)]
     pub previous_hash: String,
+    #[serde(default, deserialize_with = "deserialize_u32_from_string_or_number")]
     pub transaction_count: u32,
+    #[serde(default, deserialize_with = "deserialize_u32_from_string_or_number")]
     pub operation_count: u32,
     pub closed_at: String,
+    #[serde(default, deserialize_with = "deserialize_string_from_string_or_number")]
     pub total_coins: String,
+    #[serde(default, deserialize_with = "deserialize_string_from_string_or_number")]
     pub fee_pool: String,
+    #[serde(default, deserialize_with = "deserialize_u32_from_string_or_number")]
     pub base_fee: u32,
+    #[serde(default, deserialize_with = "deserialize_string_from_string_or_number")]
     pub base_reserve: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payment {
     pub id: String,
+    #[serde(default)]
     pub paging_token: String,
+    #[serde(default)]
     pub transaction_hash: String,
+    #[serde(default)]
     pub source_account: String,
     #[serde(default)]
     pub destination: String,
+    #[serde(default)]
     pub asset_type: String,
+    #[serde(default)]
     pub asset_code: Option<String>,
+    #[serde(default)]
     pub asset_issuer: Option<String>,
+    #[serde(default)]
     pub amount: String,
+    #[serde(default)]
     pub created_at: String,
     // Path payment fields
     #[serde(rename = "type")]
@@ -195,25 +212,113 @@ pub struct InnerTransaction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Trade {
     pub id: String,
+    #[serde(default)]
     pub ledger_close_time: String,
+    #[serde(default)]
     pub base_account: String,
+    #[serde(default)]
     pub base_amount: String,
+    #[serde(default)]
     pub base_asset_type: String,
+    #[serde(default)]
     pub base_asset_code: Option<String>,
+    #[serde(default)]
     pub base_asset_issuer: Option<String>,
+    #[serde(default)]
     pub counter_account: String,
+    #[serde(default)]
     pub counter_amount: String,
+    #[serde(default)]
     pub counter_asset_type: String,
+    #[serde(default)]
     pub counter_asset_code: Option<String>,
+    #[serde(default)]
     pub counter_asset_issuer: Option<String>,
+    #[serde(default)]
     pub price: Price,
+    #[serde(default)]
     pub trade_type: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Price {
+    #[serde(deserialize_with = "deserialize_i64_from_string_or_number")]
     pub n: i64,
+    #[serde(deserialize_with = "deserialize_i64_from_string_or_number")]
     pub d: i64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum NumberOrString {
+    String(String),
+    I64(i64),
+    U64(u64),
+    F64(f64),
+}
+
+fn deserialize_u64_from_string_or_number<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    match NumberOrString::deserialize(deserializer)? {
+        NumberOrString::String(s) => s
+            .parse::<u64>()
+            .map_err(|e| D::Error::custom(format!("invalid u64 string '{}': {}", s, e))),
+        NumberOrString::I64(v) => {
+            u64::try_from(v).map_err(|_| D::Error::custom(format!("negative value for u64: {}", v)))
+        }
+        NumberOrString::U64(v) => Ok(v),
+        NumberOrString::F64(v) => {
+            if v.is_finite() && v >= 0.0 {
+                Ok(v as u64)
+            } else {
+                Err(D::Error::custom(format!("invalid f64 for u64: {}", v)))
+            }
+        }
+    }
+}
+
+fn deserialize_u32_from_string_or_number<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = deserialize_u64_from_string_or_number(deserializer)?;
+    u32::try_from(value)
+        .map_err(|_| D::Error::custom(format!("value {} does not fit in u32", value)))
+}
+
+fn deserialize_i64_from_string_or_number<'de, D>(deserializer: D) -> Result<i64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    match NumberOrString::deserialize(deserializer)? {
+        NumberOrString::String(s) => s
+            .parse::<i64>()
+            .map_err(|e| D::Error::custom(format!("invalid i64 string '{}': {}", s, e))),
+        NumberOrString::I64(v) => Ok(v),
+        NumberOrString::U64(v) => i64::try_from(v)
+            .map_err(|_| D::Error::custom(format!("value {} does not fit in i64", v))),
+        NumberOrString::F64(v) => {
+            if v.is_finite() {
+                Ok(v as i64)
+            } else {
+                Err(D::Error::custom(format!("invalid f64 for i64: {}", v)))
+            }
+        }
+    }
+}
+
+fn deserialize_string_from_string_or_number<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(match NumberOrString::deserialize(deserializer)? {
+        NumberOrString::String(s) => s,
+        NumberOrString::I64(v) => v.to_string(),
+        NumberOrString::U64(v) => v.to_string(),
+        NumberOrString::F64(v) => v.to_string(),
+    })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -287,13 +392,25 @@ pub struct HorizonPoolReserve {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HorizonLiquidityPool {
     pub id: String,
-    #[serde(rename = "fee_bp")]
+    #[serde(
+        rename = "fee_bp",
+        default,
+        deserialize_with = "deserialize_u32_from_string_or_number"
+    )]
     pub fee_bp: u32,
     #[serde(rename = "type")]
     pub pool_type: String,
-    #[serde(rename = "total_trustlines")]
+    #[serde(
+        rename = "total_trustlines",
+        default,
+        deserialize_with = "deserialize_u64_from_string_or_number"
+    )]
     pub total_trustlines: u64,
-    #[serde(rename = "total_shares")]
+    #[serde(
+        rename = "total_shares",
+        default,
+        deserialize_with = "deserialize_string_from_string_or_number"
+    )]
     pub total_shares: String,
     pub reserves: Vec<HorizonPoolReserve>,
     pub paging_token: Option<String>,
