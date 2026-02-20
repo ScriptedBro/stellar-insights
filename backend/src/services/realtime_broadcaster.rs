@@ -387,14 +387,12 @@ impl WsMessage {
             }
             BroadcastMessage::NewPayment { payment, .. } => {
                 let corridor = payment.get_corridor();
+                let event_time = payment.timestamp.unwrap_or(payment.created_at);
                 WsMessage::NewPayment {
                     corridor_id: corridor.to_string_key(),
                     amount: payment.amount,
                     successful: payment.successful,
-                    timestamp: payment
-                        .timestamp
-                        .map(|value| value.to_rfc3339())
-                        .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                    timestamp: event_time.to_rfc3339(),
                 }
             }
             BroadcastMessage::HealthAlert { corridor_id, severity, message, timestamp } => {
