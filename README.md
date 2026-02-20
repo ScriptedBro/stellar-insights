@@ -122,19 +122,21 @@ Frontend (Next.js) → Backend (Rust) → Stellar RPC
 We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 **Quick Links:**
-- [GitHub Issues](https://github.com/Ndifreke000/stellar-insights/issues) - 70 issues ready to work on
+- [GitHub Issues](https://github.com/Ndifreke000/stellar-insights/issues) - Report bugs and request features
 - [API Documentation](./docs/RPC.md) - Complete endpoint reference
-- [Smart Contracts](./contracts/README.md) - Soroban contract docs
+- [Remaining Tasks](./issues/REMAINING-ISSUES-022-090.md) - Development roadmap
 
 ---
 
 ## 📖 Documentation
 
 - [RPC.md](./docs/RPC.md) - API endpoints and usage
+- [RPC Data Sources](./docs/RPC_DATA_SOURCES.md) - Stellar RPC integration details
+- [RPC Integration Summary](./docs/RPC_INTEGRATION_SUMMARY.md) - Integration overview
+- [SEP-24](./docs/SEP24.md) - Hosted Deposit/Withdrawal
+- [SEP-31](./docs/SEP31.md) - Cross-Border Payments
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - Development guidelines
-- [BACKEND_ISSUES.md](./BACKEND_ISSUES.md) - 70 development tasks
-- [backend/README.md](./backend/README.md) - Backend setup
-- [contracts/README.md](./contracts/README.md) - Smart contract guide
+- [Remaining Issues](./issues/REMAINING-ISSUES-022-090.md) - Development tasks
 
 ---
 
