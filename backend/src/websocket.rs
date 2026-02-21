@@ -227,6 +227,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<WsState>) {
 
     // Register the connection
     state.connections.insert(connection_id, tx);
+    crate::observability::metrics::set_active_connections(state.connection_count() as i64);
 
     // Subscribe to broadcast messages
     let mut broadcast_rx = state.tx.subscribe();
@@ -368,6 +369,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<WsState>) {
 
     // Clean up connection
     state.cleanup_connection(connection_id);
+    crate::observability::metrics::set_active_connections(state.connection_count() as i64);
     info!(
         "WebSocket connection {} closed. Active connections: {}",
         connection_id,

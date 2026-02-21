@@ -392,7 +392,9 @@ impl StellarRpcClient {
         });
 
         let response = self
-            .retry_request(|| async { self.client.post(&self.rpc_url).json(&payload).send().await })
+            .retry_request("check_health", || async {
+                self.client.post(&self.rpc_url).json(&payload).send().await
+            })
             .await
             .context("Failed to check RPC health")?;
 
@@ -419,7 +421,7 @@ impl StellarRpcClient {
         let url = format!("{}/ledgers?order=desc&limit=1", self.horizon_url);
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_latest_ledger", || async { self.client.get(&url).send().await })
             .await
             .context("Failed to fetch latest ledger")?;
 
@@ -480,7 +482,9 @@ impl StellarRpcClient {
         });
 
         let response = self
-            .retry_request(|| async { self.client.post(&self.rpc_url).json(&payload).send().await })
+            .retry_request("fetch_ledgers", || async {
+                self.client.post(&self.rpc_url).json(&payload).send().await
+            })
             .await
             .context("Failed to fetch ledgers")?;
 
@@ -513,7 +517,7 @@ impl StellarRpcClient {
         }
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_payments", || async { self.client.get(&url).send().await })
             .await
             .context("Failed to fetch payments")?;
 
@@ -545,7 +549,7 @@ impl StellarRpcClient {
         }
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_trades", || async { self.client.get(&url).send().await })
             .await
             .context("Failed to fetch trades")?;
 
@@ -584,7 +588,7 @@ impl StellarRpcClient {
         );
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_order_book", || async { self.client.get(&url).send().await })
             .await
             .context("Failed to fetch order book")?;
 
@@ -607,7 +611,9 @@ impl StellarRpcClient {
         );
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_payments_for_ledger", || async {
+                self.client.get(&url).send().await
+            })
             .await
             .context("Failed to fetch ledger payments")?;
 
@@ -637,7 +643,9 @@ impl StellarRpcClient {
         );
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_transactions_for_ledger", || async {
+                self.client.get(&url).send().await
+            })
             .await
             .context("Failed to fetch ledger transactions")?;
 
@@ -667,7 +675,9 @@ impl StellarRpcClient {
         );
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_operations_for_ledger", || async {
+                self.client.get(&url).send().await
+            })
             .await
             .context("Failed to fetch ledger operations")?;
 
@@ -694,7 +704,9 @@ impl StellarRpcClient {
         );
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_operation_effects", || async {
+                self.client.get(&url).send().await
+            })
             .await
             .context("Failed to fetch operation effects")?;
 
@@ -730,7 +742,9 @@ impl StellarRpcClient {
         );
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_account_payments", || async {
+                self.client.get(&url).send().await
+            })
             .await
             .context("Failed to fetch account payments")?;
 
@@ -769,13 +783,18 @@ impl StellarRpcClient {
     }
 
     /// Retry a request with exponential backoff
-    async fn retry_request<F, Fut>(&self, request_fn: F) -> Result<reqwest::Response>
+    async fn retry_request<F, Fut>(
+        &self,
+        method_name: &'static str,
+        request_fn: F,
+    ) -> Result<reqwest::Response>
     where
         F: Fn() -> Fut,
         Fut: std::future::Future<Output = Result<reqwest::Response, reqwest::Error>>,
     {
         let mut attempt = 0;
         let mut backoff_ms = INITIAL_BACKOFF_MS;
+        let request_start = Instant::now();
 
         loop {
             let start_time = Instant::now();
@@ -786,6 +805,11 @@ impl StellarRpcClient {
 
                     if response.status().is_success() {
                         debug!("Request succeeded in {} ms", elapsed);
+                        crate::observability::metrics::record_rpc_call(
+                            method_name,
+                            "success",
+                            request_start.elapsed().as_secs_f64(),
+                        );
                         return Ok(response);
                     } else {
                         let status = response.status();
@@ -800,6 +824,12 @@ impl StellarRpcClient {
                         );
 
                         if attempt >= MAX_RETRIES {
+                            crate::observability::metrics::record_rpc_call(
+                                method_name,
+                                "error",
+                                request_start.elapsed().as_secs_f64(),
+                            );
+                            crate::observability::metrics::record_error("rpc_http_error");
                             anyhow::bail!(
                                 "Request failed after {} retries. Status: {}, Error: {}",
                                 MAX_RETRIES,
@@ -820,6 +850,12 @@ impl StellarRpcClient {
                     );
 
                     if attempt >= MAX_RETRIES {
+                        crate::observability::metrics::record_rpc_call(
+                            method_name,
+                            "error",
+                            request_start.elapsed().as_secs_f64(),
+                        );
+                        crate::observability::metrics::record_error("rpc_transport_error");
                         return Err(err)
                             .context(format!("Request failed after {} retries", MAX_RETRIES));
                     }
@@ -1215,7 +1251,9 @@ impl StellarRpcClient {
         }
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_liquidity_pools", || async {
+                self.client.get(&url).send().await
+            })
             .await
             .context("Failed to fetch liquidity pools")?;
 
@@ -1244,7 +1282,9 @@ impl StellarRpcClient {
         let url = format!("{}/liquidity_pools/{}", self.horizon_url, pool_id);
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_liquidity_pool", || async {
+                self.client.get(&url).send().await
+            })
             .await
             .context("Failed to fetch liquidity pool")?;
 
@@ -1273,7 +1313,7 @@ impl StellarRpcClient {
         );
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_pool_trades", || async { self.client.get(&url).send().await })
             .await
             .context("Failed to fetch pool trades")?;
 
@@ -1303,7 +1343,7 @@ impl StellarRpcClient {
         }
 
         let response = self
-            .retry_request(|| async { self.client.get(&url).send().await })
+            .retry_request("fetch_assets", || async { self.client.get(&url).send().await })
             .await
             .context("Failed to fetch assets")?;
 

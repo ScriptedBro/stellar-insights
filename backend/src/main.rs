@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tower_http::compression::{CompressionLayer, predicate::SizeAbove};
 use tower_http::cors::{Any, CorsLayer};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -30,7 +30,9 @@ use stellar_insights_backend::ingestion::ledger::LedgerIngestionService;
 use stellar_insights_backend::ingestion::DataIngestionService;
 use stellar_insights_backend::network::NetworkConfig;
 use stellar_insights_backend::openapi::ApiDoc;
+use stellar_insights_backend::observability::{metrics as obs_metrics, tracing as obs_tracing};
 use stellar_insights_backend::rate_limit::{rate_limit_middleware, RateLimitConfig, RateLimiter};
+use stellar_insights_backend::request_id::request_id_middleware;
 use stellar_insights_backend::rpc::StellarRpcClient;
 use stellar_insights_backend::rpc_handlers;
 use stellar_insights_backend::services::account_merge_detector::AccountMergeDetector;
@@ -53,14 +55,9 @@ async fn main() -> Result<()> {
     // Load environment variables
     dotenv().ok();
 
-    // Initialize tracing
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "backend=info,tower_http=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // Initialize tracing + optional OpenTelemetry exporter
+    obs_tracing::init_tracing("stellar-insights-backend")?;
+    obs_metrics::init_metrics();
 
     tracing::info!("Starting Stellar Insights Backend");
 
@@ -195,7 +192,9 @@ async fn main() -> Result<()> {
             interval.tick().await;
             if let Err(e) = ingestion_clone.sync_all_metrics().await {
                 tracing::error!("Metrics synchronization failed: {}", e);
+                obs_metrics::record_background_job("metrics_sync", "error");
             } else {
+                obs_metrics::record_background_job("metrics_sync", "success");
                 // Invalidate caches after successful sync
                 if let Err(e) = cache_invalidation_clone.invalidate_anchors().await {
                     tracing::warn!("Failed to invalidate anchor caches: {}", e);
@@ -259,6 +258,7 @@ async fn main() -> Result<()> {
         loop {
             match ledger_ingestion_clone.run_ingestion(5).await {
                 Ok(count) => {
+                    obs_metrics::record_background_job("ledger_ingestion", "success");
                     if count == 0 {
                         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     } else {
@@ -267,6 +267,7 @@ async fn main() -> Result<()> {
                 }
                 Err(e) => {
                     tracing::error!("Ledger ingestion failed: {}", e);
+                    obs_metrics::record_background_job("ledger_ingestion", "error");
                     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                 }
             }
@@ -282,9 +283,15 @@ async fn main() -> Result<()> {
             interval.tick().await;
             if let Err(e) = lp_analyzer_clone.sync_pools().await {
                 tracing::error!("Liquidity pool sync failed: {}", e);
+                obs_metrics::record_background_job("liquidity_pool_sync", "error");
+            } else {
+                obs_metrics::record_background_job("liquidity_pool_sync", "success");
             }
             if let Err(e) = lp_analyzer_clone.take_snapshots().await {
                 tracing::error!("Liquidity pool snapshot failed: {}", e);
+                obs_metrics::record_background_job("liquidity_pool_snapshot", "error");
+            } else {
+                obs_metrics::record_background_job("liquidity_pool_snapshot", "success");
             }
         }
     });
@@ -298,9 +305,15 @@ async fn main() -> Result<()> {
             interval.tick().await;
             if let Err(e) = trustline_analyzer_clone.sync_assets().await {
                 tracing::error!("Trustline sync failed: {}", e);
+                obs_metrics::record_background_job("trustline_sync", "error");
+            } else {
+                obs_metrics::record_background_job("trustline_sync", "success");
             }
             if let Err(e) = trustline_analyzer_clone.take_snapshots().await {
                 tracing::error!("Trustline snapshot failed: {}", e);
+                obs_metrics::record_background_job("trustline_snapshot", "error");
+            } else {
+                obs_metrics::record_background_job("trustline_snapshot", "success");
             }
         }
     });
@@ -656,6 +669,7 @@ async fn main() -> Result<()> {
         .layer(cors.clone());
     
     let app = Router::new()
+        .route("/metrics", get(obs_metrics::metrics_handler))
         .merge(swagger_routes)
         .merge(auth_routes)
         .merge(cached_routes)
@@ -671,6 +685,9 @@ async fn main() -> Result<()> {
         .merge(cache_routes)
         .merge(metrics_routes)
         .merge(ws_routes)
+        .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(obs_metrics::http_metrics_middleware))
+        .layer(middleware::from_fn(request_id_middleware))
         .layer(compression); // Apply compression to all routes
 
     // Start server
@@ -685,6 +702,8 @@ async fn main() -> Result<()> {
         app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
     .await?;
+
+    obs_tracing::shutdown_tracing();
 
     Ok(())
 }
